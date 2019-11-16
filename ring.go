@@ -22,6 +22,9 @@ type Ring struct {
 	mutex       sync.Mutex
 }
 
+// Create a new Ring Buffer using the underlying file (`fd`) to read and
+// write entries to. Ensure that the file was opened r/w and the user is able
+// to mmap the file.
 func New(fd *os.File) (*Ring, error) {
 	stat, err := fd.Stat()
 	if err != nil {
