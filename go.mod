@@ -1,3 +1,3 @@
-module pault.ag/go/go-diskring
+module pault.ag/go/diskring
 
 go 1.14
