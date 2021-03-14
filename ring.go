@@ -31,6 +31,8 @@ import (
 // mmapping a file into the Ring, and aligning it so that reads and writes
 // below the size of the buffer wrap.
 type Ring struct {
+	file *os.File
+
 	ringBase uintptr
 	ringOne  uintptr
 	ringTwo  uintptr
@@ -60,17 +62,17 @@ func New(fd *os.File) (*Ring, error) {
 // In addition to the Ring buffer and any error conditions, this function also
 // passes a closer to close the handle to the underlying *os.File object.
 // This should be defer'd in a place that makes sense in the Ring lifecycle.
-func Open(path string) (*Ring, func() error, error) {
+func Open(path string) (*Ring, error) {
 	fd, err := os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	ring, err := New(fd)
 	if err != nil {
 		fd.Close()
-		return nil, nil, err
+		return nil, err
 	}
-	return ring, fd.Close, nil
+	return ring, nil
 }
 
 // OpenWithOptions will open the existing file at the provided path, and return it
@@ -82,17 +84,17 @@ func Open(path string) (*Ring, func() error, error) {
 //
 // Additionally, this will construct the Ring according to the options
 // set in the passed Options struct.
-func OpenWithOptions(path string, options Options) (*Ring, func() error, error) {
+func OpenWithOptions(path string, options Options) (*Ring, error) {
 	fd, err := os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	ring, err := NewWithOptions(fd, options)
 	if err != nil {
 		fd.Close()
-		return nil, nil, err
+		return nil, err
 	}
-	return ring, fd.Close, nil
+	return ring, nil
 }
 
 // Options contains some "extra" configuration that can be used to control
@@ -159,6 +161,8 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 	}
 
 	return &Ring{
+		file: fd,
+
 		size: size,
 		head: 0,
 		tail: 0,
@@ -172,6 +176,19 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 		mutex:       sync.Mutex{},
 		blockWrites: false,
 	}, nil
+}
+
+func (r *Ring) Close() error {
+	if err := munmap(r.ringOne, r.size); err != nil {
+		return err
+	}
+	if err := munmap(r.ringTwo, r.size); err != nil {
+		return err
+	}
+	if err := munmap(r.ringBase, r.size<<1); err != nil {
+		return err
+	}
+	return r.file.Close()
 }
 
 // vim: foldmethod=marker

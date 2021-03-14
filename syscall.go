@@ -45,6 +45,17 @@ func mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int6
 	return xaddr, nil
 }
 
+// syscall.Munmap won't let us unmap on a uintptr since it works in terms of
+// (a very sensible!) []byte abstraction. This will let us unmap a specific
+// address, due to how we create our []byte abstraction.
+func munmap(addr uintptr, length uintptr) error {
+	_, _, e1 := syscall.Syscall(syscall.SYS_MUNMAP, addr, length, 0)
+	if e1 != 0 {
+		return fmt.Errorf("errno: %d", e1)
+	}
+	return nil
+}
+
 // just.... just don't look at me.
 //
 // this is maybe the unsafest thing I've done in go. turn a pointer (provided
