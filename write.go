@@ -45,9 +45,9 @@ func (r *Ring) UnblockWrites() {
 // diskring, this will advance the head until we can fit the data in. If the
 // data is more than 1/4 the size of the ring, the write will fail because
 // it's an arbitrary number I picked.
-func (r *Ring) Write(buf []byte) error {
+func (r *Ring) Write(buf []byte) (int, error) {
 	if len(buf) > int(r.size/4) {
-		return fmt.Errorf("data is too large")
+		return 0, fmt.Errorf("data is too large")
 	}
 
 	r.mutex.Lock()
@@ -57,7 +57,7 @@ func (r *Ring) Write(buf []byte) error {
 	for {
 		if (blen + uintptrSize) > r.freeBytes() {
 			if err := r.advanceHead(); err != nil {
-				return err
+				return 0, err
 			}
 			continue
 		}
@@ -68,7 +68,7 @@ func (r *Ring) Write(buf []byte) error {
 	*(*uintptr)(unsafe.Pointer(&r.buf[r.tail])) = uintptr(m)
 	r.tail = ((r.tail + uintptrSize + uintptr(m)) % r.size)
 
-	return nil
+	return m, nil
 }
 
 // vim: foldmethod=marker
