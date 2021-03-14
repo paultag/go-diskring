@@ -1,3 +1,23 @@
+// {{{ Copyright (c) Paul R. Tagliamonte <paultag@gmail.com> 2020-2021
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE. }}}
+
 package diskring
 
 import (
@@ -5,16 +25,16 @@ import (
 	"unsafe"
 )
 
-// Prevent any new writes from hitting the Ring. This will hang all writes,
-// but it will allow a process to read the buffer completely, then unlock the
-// buffer if taking new writes is absolutely unacceptable.
+// BlockWrites will prevent any new writes from hitting the Ring. This will
+// hang all writes, but it will allow a process to read the buffer completely,
+// then unlock the buffer if taking new writes is absolutely unacceptable.
 func (r *Ring) BlockWrites() {
 	r.mutex.Lock()
 	r.blockWrites = true
 	r.mutex.Unlock()
 }
 
-// Allow writes to the buffer after calling `BlockWrites`.
+// UnblockWrites will allow writes to the buffer after calling `BlockWrites`.
 func (r *Ring) UnblockWrites() {
 	r.mutex.Lock()
 	r.blockWrites = false
@@ -50,3 +70,5 @@ func (r *Ring) Write(buf []byte) error {
 
 	return nil
 }
+
+// vim: foldmethod=marker
