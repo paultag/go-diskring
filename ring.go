@@ -242,6 +242,8 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 	}, nil
 }
 
+// Close will unmap all mapped memory, as well as close the underlying
+// file handle.
 func (r *Ring) Close() error {
 	if r.headerBase != 0 {
 		if err := munmap(r.headerBase, r.headerSize); err != nil {
