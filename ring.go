@@ -45,7 +45,7 @@ type Ring struct {
 	mutex       sync.Mutex
 }
 
-// NewWithOptions will create a new Ring Buffer using the underlying file
+// New will create a new Ring Buffer using the underlying file
 // (`fd`) to read and write entries to. Ensure that the file was opened r/w and
 // the user is able to mmap the file.
 func New(fd *os.File) (*Ring, error) {
