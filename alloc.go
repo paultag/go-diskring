@@ -44,8 +44,8 @@ func (r *Ring) advanceHead() error {
 	if r.len() == 0 {
 		return io.EOF
 	}
-	length := *(*uintptr)(unsafe.Pointer(&r.buf[r.head]))
-	r.head = (r.head + length + uintptrSize) % r.size
+	length := *(*uintptr)(unsafe.Pointer(&r.buf[r.cursor.head]))
+	r.cursor.head = (r.cursor.head + length + uintptrSize) % r.size
 	return nil
 }
 
@@ -73,15 +73,15 @@ func (r *Ring) len() uintptr {
 	switch {
 	// If the head is past the tail, we have used all the data from the head
 	// to Size, then from 0 to Tail
-	case r.head > r.tail:
-		return (r.size - r.head) + r.tail
+	case r.cursor.head > r.cursor.tail:
+		return (r.size - r.cursor.head) + r.cursor.tail
 
 	// If the tail is past the head, we have used all the data from the head
 	// to the tail
-	case r.head < r.tail:
-		return r.tail - r.head
+	case r.cursor.head < r.cursor.tail:
+		return r.cursor.tail - r.cursor.head
 
-	// r.head == r.tail
+	// r.cursor.head == r.cursor.tail
 	default:
 		return 0
 	}

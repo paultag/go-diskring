@@ -25,7 +25,15 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"unsafe"
 )
+
+// Cursor is the opaque set of two uintptrs used to store the head and tail
+// information.
+type Cursor struct {
+	head uintptr
+	tail uintptr
+}
 
 // Ring contains internal state backing the actual diskring. This works by
 // mmapping a file into the Ring, and aligning it so that reads and writes
@@ -37,11 +45,13 @@ type Ring struct {
 	ringOne  uintptr
 	ringTwo  uintptr
 
-	buf []byte
-
 	size uintptr
-	head uintptr
-	tail uintptr
+
+	headerBase uintptr
+	headerSize uintptr
+	cursor     *Cursor
+
+	buf []byte
 
 	blockWrites bool
 	mutex       sync.Mutex
@@ -101,10 +111,20 @@ func OpenWithOptions(path string, options Options) (*Ring, error) {
 // the internals of the Ring. If you do not require these options, it's best
 // to invoke New, and let the library take care of defaults.
 type Options struct {
-	// Offset will set the number of bytes into the target file
-	// before mapping the ring buffer. This can be useful if you require
-	// a fixed header in the first N bytes of the file.
-	Offset int64
+
+	// ReserveHeader will use the first page for a diskring "header" where
+	// the cursor will be persisted to
+	ReserveHeader bool
+
+	// CustomHeader will create a custom header given the provided base address
+	// and size (in bytes) within the diskring Header.
+	//
+	// The custom user-header may contain a diskring.Cursor in it, and if so,
+	// returning a pointer to that object will provide state to diskring
+	// internals.
+	//
+	// A nil value will mean using an in-memory cursor.
+	CustomHeader func(unsafe.Pointer, int) (*Cursor, error)
 }
 
 // NewWithOptions will create a new Ring Buffer using the underlying file
@@ -118,11 +138,54 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 	if err != nil {
 		return nil, err
 	}
-	size := uintptr(stat.Size())
 
-	// We need to account for the header in our allocations here.
-	offset := options.Offset
-	size -= uintptr(offset)
+	var (
+		size             = uintptr(stat.Size())
+		offset     int64 = 0
+		cur              = &Cursor{head: 0, tail: 0}
+		headerBase uintptr
+	)
+	if options.ReserveHeader {
+		offset = int64(syscall.Getpagesize())
+		size -= uintptr(offset)
+
+		if offset <= int64(unsafe.Sizeof(Cursor{})) {
+			return nil, fmt.Errorf("offset can't store cursor")
+		}
+
+		// the 1st argument ("offset") is actually the size, since
+		// we're allocating the pre-offset fd hunk.
+		headerBase, err = mmap(0, uintptr(offset),
+			syscall.PROT_READ|syscall.PROT_WRITE,
+			syscall.MAP_SHARED,
+			int(fd.Fd()), 0)
+		if err != nil {
+			return nil, err
+		}
+
+		unsafeHeaderBase := unsafe.Pointer(headerBase)
+
+		// OK, we have the header allocated and ready for use. Now let's
+		// check if this is user controlled, or we can use it for our
+		// cursor.
+
+		if options.CustomHeader == nil {
+			// If we don't have a custom header layout, we can go ahead
+			// and use the whooooooooooooole 4k block for 2 uintptrs.
+			cur = (*Cursor)(unsafeHeaderBase)
+		} else {
+			// Let's ask the user nicely to allocate us space for a
+			// diskring.Cursor. If we get one, we can overwrite our
+			// in-memory cursor.
+			userCursor, err := options.CustomHeader(unsafeHeaderBase, int(offset))
+			if err != nil {
+				return nil, err
+			}
+			if userCursor != nil {
+				cur = userCursor
+			}
+		}
+	}
 
 	if int(size)%syscall.Getpagesize() != 0 {
 		return nil, fmt.Errorf("File must be aligned to page size")
@@ -162,10 +225,11 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 
 	return &Ring{
 		file: fd,
-
 		size: size,
-		head: 0,
-		tail: 0,
+
+		headerBase: headerBase,
+		headerSize: uintptr(offset),
+		cursor:     cur,
 
 		ringBase: ringBase,
 		ringOne:  ringOne,
@@ -179,6 +243,11 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 }
 
 func (r *Ring) Close() error {
+	if r.headerBase != 0 {
+		if err := munmap(r.headerBase, r.headerSize); err != nil {
+			return err
+		}
+	}
 	if err := munmap(r.ringOne, r.size); err != nil {
 		return err
 	}

@@ -47,13 +47,13 @@ func (r *Ring) Read(buf []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	length := *(*uintptr)(unsafe.Pointer(&r.buf[r.head]))
+	length := *(*uintptr)(unsafe.Pointer(&r.buf[r.cursor.head]))
 
 	if len(buf) < int(length) {
 		return 0, fmt.Errorf("buffer isn't large enough to hold chunk")
 	}
 
-	m := copy(buf, r.buf[r.head+uintptrSize:r.head+uintptrSize+length])
+	m := copy(buf, r.buf[r.cursor.head+uintptrSize:r.cursor.head+uintptrSize+length])
 	return m, r.advanceHead()
 }
 

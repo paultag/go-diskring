@@ -64,9 +64,9 @@ func (r *Ring) Write(buf []byte) (int, error) {
 		break
 	}
 
-	m := copy(r.buf[r.tail+uintptrSize:], buf)
-	*(*uintptr)(unsafe.Pointer(&r.buf[r.tail])) = uintptr(m)
-	r.tail = ((r.tail + uintptrSize + uintptr(m)) % r.size)
+	m := copy(r.buf[r.cursor.tail+uintptrSize:], buf)
+	*(*uintptr)(unsafe.Pointer(&r.buf[r.cursor.tail])) = uintptr(m)
+	r.cursor.tail = ((r.cursor.tail + uintptrSize + uintptr(m)) % r.size)
 
 	return m, nil
 }
