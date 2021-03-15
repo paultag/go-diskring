@@ -41,6 +41,7 @@ type Cursor struct {
 type Ring struct {
 	file *os.File
 
+	readOnly   bool
 	blockReads bool
 	wakeup     chan struct{}
 
@@ -121,6 +122,10 @@ type Options struct {
 	// ReadOnlyCursor will load the state from the diskring into the Cursor,
 	// but use the in-memory cursor rather than the cursor on disk, to allow
 	// dumping data without mutating the on-disk file.
+	//
+	// Since writes during an in-memory condition are nonsensical (e.g.,
+	// it will write data to disk without updating accounting), all writes
+	// when ReadOnlyCursor is true will be blocked.
 	ReadOnlyCursor bool
 
 	// BlockReads will block reads rather than returning an io.EOF when
@@ -242,6 +247,7 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 		file: fd,
 		size: size,
 
+		readOnly:   options.ReadOnlyCursor,
 		blockReads: options.BlockReads,
 		wakeup:     make(chan struct{}),
 

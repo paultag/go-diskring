@@ -46,8 +46,11 @@ func (r *Ring) UnblockWrites() {
 // data is more than 1/4 the size of the ring, the write will fail because
 // it's an arbitrary number I picked.
 func (r *Ring) Write(buf []byte) (int, error) {
+	if r.readOnly {
+		return 0, fmt.Errorf("diskring: read only")
+	}
 	if len(buf) > int(r.size/4) {
-		return 0, fmt.Errorf("data is too large")
+		return 0, fmt.Errorf("diskring: data is too large")
 	}
 
 	r.mutex.Lock()
