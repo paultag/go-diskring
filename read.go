@@ -34,8 +34,6 @@ import (
 // provided `buf`, or it will forever cycle trying to read that one entry.
 //
 // After the data is copied to the buf, the ring buffer head will be advanced.
-//
-//
 func (r *Ring) Read(buf []byte) (int, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

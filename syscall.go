@@ -33,8 +33,6 @@ import (
 // map.
 //
 // very gross much wow
-//
-//
 func mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (uintptr, error) {
 	r0, _, e1 := syscall.Syscall6(syscall.SYS_MMAP, addr, length,
 		uintptr(prot), uintptr(flags), uintptr(fd), uintptr(offset))
@@ -60,7 +58,6 @@ func munmap(addr uintptr, length uintptr) error {
 //
 // this is maybe the unsafest thing I've done in go. turn a pointer (provided
 // as a uint) into a go byte slice D:
-//
 func asByteSlice(base uintptr, size int) *[]byte {
 	var b = struct {
 		addr uintptr
