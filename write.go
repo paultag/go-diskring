@@ -68,6 +68,11 @@ func (r *Ring) Write(buf []byte) (int, error) {
 	*(*uintptr)(unsafe.Pointer(&r.buf[r.cursor.tail])) = uintptr(m)
 	r.cursor.tail = ((r.cursor.tail + uintptrSize + uintptr(m)) % r.size)
 
+	select {
+	case r.wakeup <- struct{}{}:
+	default:
+	}
+
 	return m, nil
 }
 

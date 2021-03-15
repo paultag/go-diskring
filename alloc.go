@@ -34,6 +34,14 @@ var (
 
 // UNSAFE
 //
+// Reset the cursor to 0, 0, "unlinking" all entries.
+func (r *Ring) reset() {
+	r.cursor.head = 0
+	r.cursor.tail = 0
+}
+
+// UNSAFE
+//
 // Read the head pointer's entry length, and jump ahead by that amount.
 // This will set the head to the next entry, dropping the old head entry.
 //

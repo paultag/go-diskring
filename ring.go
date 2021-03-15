@@ -41,6 +41,9 @@ type Cursor struct {
 type Ring struct {
 	file *os.File
 
+	eofReads bool
+	wakeup   chan struct{}
+
 	ringBase uintptr
 	ringOne  uintptr
 	ringTwo  uintptr
@@ -111,6 +114,9 @@ func OpenWithOptions(path string, options Options) (*Ring, error) {
 // the internals of the Ring. If you do not require these options, it's best
 // to invoke New, and let the library take care of defaults.
 type Options struct {
+	// EOFReads will return an io.EOF when the read cursor catches up to
+	// the write cursor.
+	EOFReads bool
 
 	// ReserveHeader will use the first page for a diskring "header" where
 	// the cursor will be persisted to
@@ -227,6 +233,9 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 		file: fd,
 		size: size,
 
+		wakeup:   make(chan struct{}),
+		eofReads: options.EOFReads,
+
 		headerBase: headerBase,
 		headerSize: uintptr(offset),
 		cursor:     cur,
@@ -260,6 +269,12 @@ func (r *Ring) Close() error {
 		return err
 	}
 	return r.file.Close()
+}
+
+func (r *Ring) Reset() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.reset()
 }
 
 // vim: foldmethod=marker
