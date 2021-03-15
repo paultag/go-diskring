@@ -22,6 +22,7 @@ package diskring
 
 import (
 	"fmt"
+	"io"
 	"unsafe"
 )
 
@@ -40,9 +41,14 @@ func (r *Ring) Read(buf []byte) (int, error) {
 	defer r.mutex.Unlock()
 
 	if r.len() == 0 {
-		r.mutex.Unlock()
-		<-r.wakeup
-		r.mutex.Lock()
+		switch r.blockReads {
+		case true:
+			r.mutex.Unlock()
+			<-r.wakeup
+			r.mutex.Lock()
+		case false:
+			return 0, io.EOF
+		}
 	}
 
 	length := *(*uintptr)(unsafe.Pointer(&r.buf[r.cursor.head]))

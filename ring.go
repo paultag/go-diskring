@@ -41,7 +41,8 @@ type Cursor struct {
 type Ring struct {
 	file *os.File
 
-	wakeup chan struct{}
+	blockReads bool
+	wakeup     chan struct{}
 
 	ringBase uintptr
 	ringOne  uintptr
@@ -116,6 +117,10 @@ type Options struct {
 	// ReserveHeader will use the first page for a diskring "header" where
 	// the cursor will be persisted to
 	ReserveHeader bool
+
+	// BlockReads will block reads rather than returning an io.EOF when
+	// the read cursor catches up to the write cursor.
+	BlockReads bool
 
 	// CustomHeader will create a custom header given the provided base address
 	// and size (in bytes) within the diskring Header.
@@ -228,7 +233,8 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 		file: fd,
 		size: size,
 
-		wakeup: make(chan struct{}),
+		blockReads: options.BlockReads,
+		wakeup:     make(chan struct{}),
 
 		headerBase: headerBase,
 		headerSize: uintptr(offset),
