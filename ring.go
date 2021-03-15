@@ -118,6 +118,11 @@ type Options struct {
 	// the cursor will be persisted to
 	ReserveHeader bool
 
+	// ReadOnlyCursor will load the state from the diskring into the Cursor,
+	// but use the in-memory cursor rather than the cursor on disk, to allow
+	// dumping data without mutating the on-disk file.
+	ReadOnlyCursor bool
+
 	// BlockReads will block reads rather than returning an io.EOF when
 	// the read cursor catches up to the write cursor.
 	BlockReads bool
@@ -190,6 +195,10 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 			if userCursor != nil {
 				cur = userCursor
 			}
+		}
+
+		if options.ReadOnlyCursor {
+			cur = &Cursor{head: cur.head, tail: cur.tail}
 		}
 	}
 
