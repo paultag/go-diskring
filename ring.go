@@ -313,6 +313,9 @@ func (r *Ring) Close() error {
 	return r.file.Close()
 }
 
+// Reset will reset the cursors to empty the ring buffer, and start again
+// with the entire buffer unallocated. This will discard any data currently
+// in the buffer.
 func (r *Ring) Reset() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
