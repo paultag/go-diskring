@@ -303,6 +303,9 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 // Close will unmap all mapped memory, as well as close the underlying
 // file handle.
 func (r *Ring) Close() error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	if r.headerBase != 0 {
 		if err := munmap(r.headerBase, r.headerSize); err != nil {
 			return err
@@ -317,7 +320,6 @@ func (r *Ring) Close() error {
 	if err := munmap(r.ringBase, r.size<<1); err != nil {
 		return err
 	}
-
 	if r.dontCloseFile {
 		return nil
 	}
