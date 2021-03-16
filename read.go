@@ -53,7 +53,7 @@ func (r *Ring) Read(buf []byte) (int, error) {
 
 	if len(buf) < int(length) {
 		return 0, fmt.Errorf(
-			"buffer isn't large enough to hold chunk (need=%d, have=%s)",
+			"buffer isn't large enough to hold chunk (need=%d, have=%d)",
 			length, len(buf),
 		)
 	}
