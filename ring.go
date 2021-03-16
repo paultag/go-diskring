@@ -160,6 +160,9 @@ type Options struct {
 	// returning a pointer to that object will provide state to diskring
 	// internals.
 	//
+	// This is only invoked if ReserveHeader is 'true', since otherwise there
+	// is no header to read.
+	//
 	// This function is wildly unsafe, be very very careful when doing this,
 	// please.
 	//
