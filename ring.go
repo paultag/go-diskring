@@ -41,9 +41,9 @@ type Cursor struct {
 type Ring struct {
 	file *os.File
 
-	readOnly   bool
-	blockReads bool
-	wakeup     chan struct{}
+	readOnly       bool
+	dontBlockReads bool
+	wakeup         chan struct{}
 
 	ringBase uintptr
 	ringOne  uintptr
@@ -72,10 +72,6 @@ func New(fd *os.File) (*Ring, error) {
 
 // Open will open the existing file at the provided path, and return it
 // as a loaded Ring buffer.
-//
-// In addition to the Ring buffer and any error conditions, this function also
-// passes a closer to close the handle to the underlying *os.File object.
-// This should be defer'd in a place that makes sense in the Ring lifecycle.
 func Open(path string) (*Ring, error) {
 	fd, err := os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
@@ -91,10 +87,6 @@ func Open(path string) (*Ring, error) {
 
 // OpenWithOptions will open the existing file at the provided path, and return it
 // as a loaded Ring buffer.
-//
-// In addition to the Ring buffer and any error conditions, this function also
-// passes a closer to close the handle to the underlying *os.File object.
-// This should be defer'd in a place that makes sense in the Ring lifecycle.
 //
 // Additionally, this will construct the Ring according to the options
 // set in the passed Options struct.
@@ -114,23 +106,52 @@ func OpenWithOptions(path string, options Options) (*Ring, error) {
 // Options contains some "extra" configuration that can be used to control
 // the internals of the Ring. If you do not require these options, it's best
 // to invoke New, and let the library take care of defaults.
+//
+// The default state is assuming that the process is using a disk backed
+// ringbuffer in a similar way to an io.Pipe, where bytes are being read
+// and written to it from within the same process.
+//
+// If recovering the data is desired, or custom data to be written into the
+// file along with your buffer, the options in this struct may be required.
 type Options struct {
 	// ReserveHeader will use the first page for a diskring "header" where
 	// the cursor will be persisted to
+	//
+	// Default: false
+	//
+	// This implies that the state of the read and write cursor should
+	// be recovered from the first page of the mmap'd file, meaning that
+	// the data in the buffer will be recovered when re-opening an existing
+	// file. If the data is not desired, calling Reset on the Ring is
+	// advised.
 	ReserveHeader bool
 
 	// ReadOnlyCursor will load the state from the diskring into the Cursor,
 	// but use the in-memory cursor rather than the cursor on disk, to allow
 	// dumping data without mutating the on-disk file.
 	//
+	// Default: false
+	// Note: This is only used (or even matters!) if ReserveHeader is 'true',
+	// since the cursor will be in memory if the Header is not used
+	// for the cursor.
+	//
 	// Since writes during an in-memory condition are nonsensical (e.g.,
 	// it will write data to disk without updating accounting), all writes
 	// when ReadOnlyCursor is true will be blocked.
 	ReadOnlyCursor bool
 
-	// BlockReads will block reads rather than returning an io.EOF when
-	// the read cursor catches up to the write cursor.
-	BlockReads bool
+	// DontBlockReads will block reads until new data is written, rather than
+	// returning an io.EOF when the read cursor catches up to the write
+	// cursor.
+	//
+	// Default: false
+	//
+	// If you're reading and writing from the same buffer in the same process,
+	// this is likely something to be set to "true" (e.g. to make it work
+	// like an io.Pipe, but backed by a disk), but if you are reading a
+	// file from disk to try and dump data in the buffer, this should likely
+	// be 'false'.
+	DontBlockReads bool
 
 	// CustomHeader will create a custom header given the provided base address
 	// and size (in bytes) within the diskring Header.
@@ -138,6 +159,9 @@ type Options struct {
 	// The custom user-header may contain a diskring.Cursor in it, and if so,
 	// returning a pointer to that object will provide state to diskring
 	// internals.
+	//
+	// This function is wildly unsafe, be very very careful when doing this,
+	// please.
 	//
 	// A nil value will mean using an in-memory cursor.
 	CustomHeader func(unsafe.Pointer, int) (*Cursor, error)
@@ -247,9 +271,9 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 		file: fd,
 		size: size,
 
-		readOnly:   options.ReadOnlyCursor,
-		blockReads: options.BlockReads,
-		wakeup:     make(chan struct{}),
+		readOnly:       options.ReadOnlyCursor,
+		dontBlockReads: options.DontBlockReads,
+		wakeup:         make(chan struct{}),
 
 		headerBase: headerBase,
 		headerSize: uintptr(offset),

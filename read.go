@@ -39,12 +39,12 @@ func (r *Ring) Read(buf []byte) (int, error) {
 	defer r.mutex.Unlock()
 
 	if r.len() == 0 {
-		switch r.blockReads {
-		case true:
+		switch r.dontBlockReads {
+		case false:
 			r.mutex.Unlock()
 			<-r.wakeup
 			r.mutex.Lock()
-		case false:
+		case true:
 			return 0, io.EOF
 		}
 	}
