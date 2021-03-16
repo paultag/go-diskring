@@ -39,7 +39,8 @@ type Cursor struct {
 // mmapping a file into the Ring, and aligning it so that reads and writes
 // below the size of the buffer wrap.
 type Ring struct {
-	file *os.File
+	file          *os.File
+	dontCloseFile bool
 
 	readOnly       bool
 	dontBlockReads bool
@@ -168,6 +169,11 @@ type Options struct {
 	//
 	// A nil value will mean using an in-memory cursor.
 	CustomHeader func(unsafe.Pointer, int) (*Cursor, error)
+
+	// DontCloseFile will not call Close on the underlying *os.File that
+	// is held by the Ring buffer. This can be useful if the file lifecycle
+	// is required outside the lifecycle of the Ring.
+	DontCloseFile bool
 }
 
 // NewWithOptions will create a new Ring Buffer using the underlying file
@@ -271,8 +277,9 @@ func NewWithOptions(fd *os.File, options Options) (*Ring, error) {
 	}
 
 	return &Ring{
-		file: fd,
-		size: size,
+		file:          fd,
+		dontCloseFile: options.DontCloseFile,
+		size:          size,
 
 		readOnly:       options.ReadOnlyCursor,
 		dontBlockReads: options.DontBlockReads,
@@ -309,6 +316,10 @@ func (r *Ring) Close() error {
 	}
 	if err := munmap(r.ringBase, r.size<<1); err != nil {
 		return err
+	}
+
+	if r.dontCloseFile {
+		return nil
 	}
 	return r.file.Close()
 }
